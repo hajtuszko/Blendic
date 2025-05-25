@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Blendic",
-    "author": "Your Name",
+    "author": "PatrykGPT",
     "version": (1, 0, 1),
     "blender": (4, 4, 0),
     "location": "3D Viewport > Sidebar > Blendic",
@@ -26,8 +26,8 @@ is_updating = False
 previous_selection_state = None
 
 # URL do sprawdzania aktualizacji (zmień na swój)
-UPDATE_URL = "https://raw.githubusercontent.com/yourusername/blendic/main/version.json"
-DOWNLOAD_URL = "https://github.com/yourusername/blendic/archive/main.zip"
+UPDATE_URL = "https://raw.githubusercontent.com/hajtuszko/blendic/main/version.json"
+DOWNLOAD_URL = "https://github.com/hajtuszko/blendic/archive/main.zip"
 
 class BlendICPreferences(AddonPreferences):
     """Preferencje addon-a"""
