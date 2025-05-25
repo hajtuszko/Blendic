@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Blendic",
     "author": "PatrykGPT",
-    "version": (1, 0, 3),
+    "version": (1, 0, 5),
     "blender": (4, 4, 0),
     "location": "3D Viewport > Sidebar > Blendic",
     "description": "Automatycznie aktualizuje obraz w UV Editorze na podstawie materiału wybranej powierzchni",
