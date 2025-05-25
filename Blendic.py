@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Blendic",
     "author": "PatrykGPT",
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "blender": (4, 4, 0),
     "location": "3D Viewport > Sidebar > Blendic",
     "description": "Automatycznie aktualizuje obraz w UV Editorze na podstawie materiału wybranej powierzchni",
@@ -26,8 +26,8 @@ is_updating = False
 previous_selection_state = None
 
 # URL do sprawdzania aktualizacji (zmień na swój)
-UPDATE_URL = "https://raw.githubusercontent.com/hajtuszko/blendic/main/version.json"
-DOWNLOAD_URL = "https://github.com/hajtuszko/blendic/archive/main.zip"
+UPDATE_URL = "https://raw.githubusercontent.com/yourusername/blendic/main/version.json"
+DOWNLOAD_URL = "https://github.com/yourusername/blendic/archive/main.zip"
 
 class BlendICPreferences(AddonPreferences):
     """Preferencje addon-a"""
@@ -129,18 +129,56 @@ class BLENDIC_OT_update_addon(Operator):
                 
                 # Znajdź folder z pluginem
                 plugin_source = None
+                
+                # GitHub tworzy folder repozytorium-main/
+                # Sprawdź wszystkie foldery w archiwum
+                print("Szukanie plików pluginu...")
                 for root, dirs, files in os.walk(extract_dir):
+                    print(f"Sprawdzam folder: {root}")
+                    print(f"Pliki: {files}")
+                    
                     if "__init__.py" in files:
                         # Sprawdź czy to nasz plugin
                         init_path = os.path.join(root, "__init__.py")
-                        with open(init_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            if 'bl_info' in content and 'Blendic' in content:
-                                plugin_source = root
-                                break
+                        try:
+                            with open(init_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                if 'bl_info' in content and ('Blendic' in content or 'blendic' in content.lower()):
+                                    plugin_source = root
+                                    print(f"Znaleziono plugin w: {plugin_source}")
+                                    break
+                        except Exception as e:
+                            print(f"Błąd czytania {init_path}: {e}")
+                            continue
+                
+                # Jeśli nie znaleziono, sprawdź czy są pliki .py z bl_info
+                if not plugin_source:
+                    for root, dirs, files in os.walk(extract_dir):
+                        for file in files:
+                            if file.endswith('.py'):
+                                file_path = os.path.join(root, file)
+                                try:
+                                    with open(file_path, 'r', encoding='utf-8') as f:
+                                        content = f.read()
+                                        if 'bl_info' in content and ('Blendic' in content or 'blendic' in content.lower()):
+                                            plugin_source = root
+                                            print(f"Znaleziono plugin (plik {file}) w: {plugin_source}")
+                                            break
+                                except:
+                                    continue
+                        if plugin_source:
+                            break
                 
                 if not plugin_source:
-                    self.report({'ERROR'}, "Nie znaleziono plików pluginu w archiwum")
+                    self.report({'ERROR'}, "Nie znaleziono plików pluginu w archiwum. Sprawdź strukturę repozytorium.")
+                    print("Struktura archiwum:")
+                    for root, dirs, files in os.walk(extract_dir):
+                        level = root.replace(extract_dir, '').count(os.sep)
+                        indent = ' ' * 2 * level
+                        print(f"{indent}{os.path.basename(root)}/")
+                        subindent = ' ' * 2 * (level + 1)
+                        for file in files:
+                            print(f"{subindent}{file}")
                     return {'FINISHED'}
                 
                 # Znajdź miejsce instalacji obecnego addonu
