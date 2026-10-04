@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursive Backtracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: plansza po lewej, panel sterowania + kod + legenda po prawej; na telefonie jedna kolumna */
+:root {
+  --bg: #eef1ee;
+  --surface: #f9faf8;
+  --ink: #1d2622;
+  --muted: #5d6b65;
+  --line: #cfd7d2;
+  --wall: #26332e;
+  --path: #f4f2e9;
+  --stack: #e8a33c;
+  --head: #d2452f;
+  --done: #c9dccf;
+  --cand: #5a8fd6;
+  --extra: #8b55c4;
+  --accent: #2f7d5b;
+  --accent-fg: #ffffff;
+  --code-bg: #e4e9e5;
+  --code-hl: #f6dfae;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131917; --surface: #1b2320; --ink: #e3ebe6; --muted: #93a39b; --line: #2e3a35;
+    --wall: #0b0f0d; --path: #d8d4c4; --stack: #e5a144; --head: #ef6a4f; --done: #7fa08c;
+    --cand: #79a9ee; --extra: #bd94ef; --accent: #4fb386; --accent-fg: #0c1410; --code-bg: #222c28; --code-hl: #5a4524;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131917; --surface: #1b2320; --ink: #e3ebe6; --muted: #93a39b; --line: #2e3a35;
+  --wall: #0b0f0d; --path: #d8d4c4; --stack: #e5a144; --head: #ef6a4f; --done: #7fa08c;
+  --cand: #79a9ee; --extra: #bd94ef; --accent: #4fb386; --accent-fg: #0c1410; --code-bg: #222c28; --code-hl: #5a4524;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 40px; display: flex; flex-direction: column; gap: 22px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 4.4vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance; }
+.lede { margin: 0; max-width: 68ch; color: var(--muted); }
+.lede code { font-family: var(--f-mono); font-size: .9em; color: var(--ink); }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.board { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.canvas-box { position: relative; width: 100%; }
+canvas { display: block; width: 100%; height: auto; border-radius: 4px; image-rendering: pixelated; }
+.status { font-family: var(--f-mono); font-size: 13px; min-height: 2.6em; color: var(--ink); background: var(--code-bg); border-radius: 6px; padding: 8px 10px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.stat span:first-child { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat b { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 600; }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.panel h2 { font-family: var(--f-display); font-weight: 500; font-size: 17px; margin: 0; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: 600 14px var(--f-body); padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); min-width: 92px; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--cand); outline-offset: 2px; }
+.field { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 14px; }
+.field label { color: var(--muted); }
+select, input[type="number"] { font: 14px var(--f-mono); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }
+.check input { accent-color: var(--accent); }
+pre.code { margin: 0; font: 12.5px/1.55 var(--f-mono); background: var(--code-bg); border-radius: 6px; padding: 8px 0; overflow-x: auto; }
+pre.code span { display: block; padding-inline: 10px; white-space: pre; border-left: 3px solid transparent; }
+pre.code span.on { background: var(--code-hl); border-left-color: var(--head); }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+.legend div { display: flex; gap: 8px; align-items: center; }
+.sw { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid var(--line); }
+.note { font-size: 13.5px; color: var(--muted); margin: 0; }
+.rng { display: flex; gap: 10px; align-items: center; }
+.rng output { font: 13px var(--f-mono); font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+.phase { font-family: var(--f-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.note b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Generowanie labiryntu · DFS z powrotami</div>
+    <h1>Recursive Backtracker na komórkach nieparzystych</h1>
+    <p class="lede">Plansza ma wymiary nieparzyste, np. 21×21. Pokojami są tylko pola o obu współrzędnych nieparzystych, <code>(1,1)</code>, <code>(3,1)</code>, <code>(1,3)</code>…, a pola parzyste to ściany. Algorytm skacze co 2 pola, a przy przejściu usuwa ścianę leżącą dokładnie pośrodku, <code>((x₁+x₂)/2, (y₁+y₂)/2)</code>. Gdy nie ma gdzie iść, cofa się po stosie. Wynik to labirynt idealny (drzewo, dużo ślepych zaułków), więc w drugiej fazie dobijamy dodatkowe przejścia: usuwamy część ślepych zaułków i otwieramy pętle, żeby układ przypominał korytarze w budynku.</p>
+  </header>
+
+  <div class="main">
+    <section class="board" aria-label="Plansza">
+      <div class="canvas-box"><canvas id="cv" width="800" height="800" aria-label="Animacja generowania labiryntu"></canvas></div>
+      <div class="status" id="status" aria-live="polite">Gotowe do startu.</div>
+      <div class="stats">
+        <div class="stat"><span>Krok</span><b id="sStep">0</b></div>
+        <div class="stat"><span>Stos</span><b id="sStack">0</b></div>
+        <div class="stat"><span>Odwiedzone</span><b id="sVis">0</b></div>
+        <div class="stat"><span>Max głęb.</span><b id="sMax">0</b></div>
+        <div class="stat"><span>Ślepe zaułki</span><b id="sDead">0</b></div>
+        <div class="stat"><span>Dodatkowe</span><b id="sExtra">0</b></div>
+        <div class="stat"><span>Faza</span><b id="sPhase">DFS</b></div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <div class="btns">
+          <button class="primary" id="bPlay">▶ Start</button>
+          <button id="bStep">Krok</button>
+          <button id="bEnd">Do końca</button>
+          <button id="bReset">Od nowa</button>
+        </div>
+        <div class="field"><label for="size">Rozmiar</label>
+          <select id="size">
+            <option value="11x11">11 × 11 (5×5 pokoi)</option>
+            <option value="15x15" selected>15 × 15 (7×7 pokoi)</option>
+            <option value="21x21">21 × 21 (10×10 pokoi)</option>
+            <option value="31x31">31 × 31 (15×15 pokoi)</option>
+            <option value="51x51">51 × 51 (25×25 pokoi)</option>
+            <option value="81x81">81 × 81 (40×40 pokoi)</option>
+          </select></div>
+        <div class="field"><label for="speed">Tempo</label><input type="range" id="speed" min="1" max="60" value="12"></div>
+        <div class="field"><label for="braid">Usuń zaułki</label><div class="rng"><input type="range" id="braid" min="0" max="100" value="50"><output id="braidV" for="braid">50%</output></div></div>
+        <div class="field"><label for="loops">Pętle</label><div class="rng"><input type="range" id="loops" min="0" max="40" value="10"><output id="loopsV" for="loops">10%</output></div></div>
+        <div class="field"><label for="seed">Ziarno RNG</label><input type="number" id="seed" value="2026"></div>
+        <label class="check"><input type="checkbox" id="coords" checked> Pokaż współrzędne (do 21×21)</label>
+        <label class="check"><input type="checkbox" id="grid" checked> Zaznacz pola nieparzyste</label>
+      </div>
+
+      <div class="panel">
+        <h2>Pseudokod</h2>
+<pre class="code" id="code"><span data-l="0">grid = ŚCIANA wszędzie            # W×H, W,H nieparzyste</span><span data-l="1">start = (1,1); grid[start] = PRZEJŚCIE</span><span data-l="2">stos = [start]</span><span data-l="3">while stos:</span><span data-l="4">  (x,y) = stos[-1]</span><span data-l="5">  sąs = [(x±2,y),(x,y±2)] w planszy</span><span data-l="6">        i grid[n] == ŚCIANA</span><span data-l="7">  if sąs:</span><span data-l="8">    (nx,ny) = losuj(sąs)</span><span data-l="9">    grid[(x+nx)/2,(y+ny)/2] = PRZEJŚCIE</span><span data-l="10">    grid[nx,ny] = PRZEJŚCIE</span><span data-l="11">    stos.push((nx,ny))</span><span data-l="12">  else:</span><span data-l="13">    stos.pop()                # powrót</span><span data-l="14"> </span><span data-l="15"># faza 2: dodatkowe przejścia</span><span data-l="16">for z in losuj(ślepe_zaułki):</span><span data-l="17">  if z nadal zaułek and los() &lt; p_zaułki:</span><span data-l="18">    przebij ścianę do sąsiada</span><span data-l="19">    (najchętniej też zaułka)</span><span data-l="20">ściany = pola (parz.,nieparz.) między pokojami</span><span data-l="21">for s in losuj(ściany)[:p_pętli·len]:</span><span data-l="22">  grid[s] = PRZEJŚCIE         # pętla</span></pre>
+      </div>
+
+      <div class="panel">
+        <h2>Legenda</h2>
+        <div class="legend">
+          <div><i class="sw" style="background:var(--wall)"></i>Ściana</div>
+          <div><i class="sw" style="background:var(--head)"></i>Bieżąca (szczyt stosu)</div>
+          <div><i class="sw" style="background:var(--stack)"></i>Na stosie</div>
+          <div><i class="sw" style="background:var(--cand)"></i>Kandydaci (x±2, y±2)</div>
+          <div><i class="sw" style="background:var(--done)"></i>Zdjęta ze stosu</div>
+          <div><i class="sw" style="background:var(--path)"></i>Gotowe przejście</div>
+          <div><i class="sw" style="background:var(--extra)"></i>Dodatkowe przejście</div>
+        </div>
+        <p class="note"><b>Dlaczego nieparzyste?</b> Indeksy zaczynają się od 0, więc wiersz i kolumna 0 oraz W−1 i H−1 (parzyste) zostają zewnętrzną ramą. Każda para sąsiednich pokoi ma między sobą dokładnie jedno pole ściany, a labirynt po fazie DFS jest drzewem rozpinającym: z każdego pokoju do każdego innego prowadzi dokładnie jedna droga.</p>
+        <p class="note"><b>Dodatkowe przejścia.</b> Ściana między dwoma pokojami leży zawsze na polu (parzyste, nieparzyste) lub (nieparzyste, parzyste). Otwarcie takiej ściany po zakończeniu DFS tworzy pętlę, czyli drugą drogę. <b>Usuń zaułki</b> przebija ślepe końcówki do sąsiada (najlepiej innego zaułka), <b>Pętle</b> otwiera podany procent pozostałych ścian wewnętrznych. Ok. 30–60% zaułków i 5–15% pętli daje układ podobny do korytarzy w domu.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const WALL = 0, PASS = 1;
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const codeLines = [...document.querySelectorAll('#code span')];
+
+  // phase: 'dfs' → 'braid' → 'loops' → 'done'
+  let W, H, grid, inStack, popped, extra, stack, cands, step, maxDepth, visited, rooms;
+  let phase, deQ, loopQ, nExtra, deadBefore, playing = false, rng, lastWall = null;
+
+  function mulberry32(a) {
+    return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  const idx = (x, y) => y * W + x;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = ([x, y]) => `(${x},${y})`;
+  const fmtList = l => l.length ? l.map(fmt).join(' ') : 'brak';
+  const inside = (x, y) => x > 0 && x < W - 1 && y > 0 && y < H - 1;
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  function reset() {
+    const [w, h] = $('size').value.split('x').map(Number);
+    W = w; H = h;
+    grid = new Uint8Array(W * H);
+    inStack = new Uint8Array(W * H);
+    popped = new Uint8Array(W * H);
+    extra = new Uint8Array(W * H);
+    rng = mulberry32(Number($('seed').value) || 1);
+    grid[idx(1, 1)] = PASS; inStack[idx(1, 1)] = 1;
+    stack = [[1, 1]]; step = 0; maxDepth = 1; visited = 1; lastWall = null;
+    phase = 'dfs'; nExtra = 0; deQ = []; loopQ = []; deadBefore = 0;
+    rooms = ((W - 1) / 2) * ((H - 1) / 2);
+    cands = neighbors(1, 1);
+    setPlaying(false);
+    hl([0, 1, 2]);
+    say(`Start w (1,1). Plansza ${W}×${H}, pokoi: ${rooms}. Kandydaci: ${fmtList(cands)}.`);
+    sizeCanvas(); draw(); stats();
+  }
+
+  function neighbors(x, y) {
+    const out = [];
+    for (const [dx, dy] of DIRS) {
+      const nx = x + 2 * dx, ny = y + 2 * dy;
+      if (inside(nx, ny) && grid[idx(nx, ny)] === WALL) out.push([nx, ny]);
+    }
+    return out;
+  }
+  // kierunki, w których z pokoju (x,y) jest już otwarte przejście
+  const openDirs = (x, y) => DIRS.filter(([dx, dy]) => grid[idx(x + dx, y + dy)] === PASS);
+  // kierunki, w których za ścianą jest inny pokój (nie rama)
+  const closedDirs = (x, y) => DIRS.filter(([dx, dy]) =>
+    inside(x + 2 * dx, y + 2 * dy) && grid[idx(x + dx, y + dy)] === WALL);
+  const isDead = (x, y) => grid[idx(x, y)] === PASS && openDirs(x, y).length === 1;
+  function deadEnds() {
+    const out = [];
+    for (let y = 1; y < H; y += 2) for (let x = 1; x < W; x += 2) if (isDead(x, y)) out.push([x, y]);
+    return out;
+  }
+  function openWall(wx, wy) { grid[idx(wx, wy)] = PASS; extra[idx(wx, wy)] = 1; nExtra++; lastWall = [wx, wy]; }
+
+  function tick() {
+    if (phase === 'dfs') return dfsTick();
+    if (phase === 'braid') return braidTick();
+    if (phase === 'loops') return loopTick();
+    return false;
+  }
+
+  function dfsTick() {
+    step++;
+    const [x, y] = stack[stack.length - 1];
+    const ns = neighbors(x, y);
+    if (ns.length) {
+      const [nx, ny] = ns[Math.floor(rng() * ns.length)];
+      const wx = (x + nx) / 2, wy = (y + ny) / 2;
+      grid[idx(wx, wy)] = PASS; grid[idx(nx, ny)] = PASS;
+      inStack[idx(nx, ny)] = 1; inStack[idx(wx, wy)] = 1;
+      stack.push([nx, ny]); visited++;
+      maxDepth = Math.max(maxDepth, stack.length);
+      lastWall = [wx, wy];
+      hl([4, 5, 6, 7, 8, 9, 10, 11]);
+      say(`${fmt([x, y])} → ${fmt([nx, ny])}: losuję z ${ns.length} kand. [${fmtList(ns)}], burzę ścianę ${fmt([wx, wy])}.`);
+    } else {
+      stack.pop();
+      inStack[idx(x, y)] = 0; popped[idx(x, y)] = 1;
+      const top = stack[stack.length - 1];
+      if (top) { // pole ściany między x,y a nowym szczytem też wraca jako „zdjęte”
+        const wx = (x + top[0]) / 2, wy = (y + top[1]) / 2;
+        inStack[idx(wx, wy)] = 0; popped[idx(wx, wy)] = 1;
+      }
+      lastWall = null;
+      hl([4, 5, 6, 7, 12, 13]);
+      say(`${fmt([x, y])}: wszyscy sąsiedzi odwiedzeni → pop. ${top ? 'Wracam do ' + fmt(top) + '.' : 'Stos pusty.'}`);
+    }
+    const t = stack[stack.length - 1];
+    cands = t ? neighbors(t[0], t[1]) : [];
+    if (!stack.length) startBraid();
+    return true;
+  }
+
+  function startBraid() {
+    phase = 'braid'; cands = []; lastWall = null;
+    deQ = shuffle(deadEnds());
+    deadBefore = deQ.length;
+    hl([15, 16]);
+    say(`DFS skończony po ${step} krokach: drzewo bez pętli, ${deadBefore} ślepych zaułków. Faza 2: usuwam zaułki (p = ${$('braid').value}%).`);
+  }
+
+  function braidTick() {
+    const p = Number($('braid').value) / 100;
+    while (deQ.length) {
+      const [x, y] = deQ.pop();
+      if (!isDead(x, y) || rng() >= p) continue;
+      const cl = closedDirs(x, y);
+      if (!cl.length) continue;
+      const pref = cl.filter(([dx, dy]) => isDead(x + 2 * dx, y + 2 * dy));
+      const pool = pref.length ? pref : cl;
+      const [dx, dy] = pool[Math.floor(rng() * pool.length)];
+      openWall(x + dx, y + dy);
+      step++;
+      cands = [[x, y], [x + 2 * dx, y + 2 * dy]];
+      hl([16, 17, 18, 19]);
+      say(`Ślepy zaułek ${fmt([x, y])}: przebijam ścianę ${fmt([x + dx, y + dy])} do ${fmt([x + 2 * dx, y + 2 * dy])}${pref.length ? ', który też był zaułkiem, więc znikają oba' : ''}.`);
+      return true;
+    }
+    startLoops();
+    return true;
+  }
+
+  function startLoops() {
+    phase = 'loops'; cands = []; lastWall = null;
+    const walls = [];
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      if ((x + y) % 2 === 1 && grid[idx(x, y)] === WALL) walls.push([x, y]);
+    }
+    const p = Number($('loops').value) / 100;
+    loopQ = shuffle(walls).slice(0, Math.round(walls.length * p));
+    hl([20, 21]);
+    say(`Faza 3: pętle. Zamkniętych ścian między pokojami: ${walls.length}, otwieram ${loopQ.length} (${$('loops').value}%).`);
+    if (!loopQ.length) finishAll();
+  }
+
+  function loopTick() {
+    if (!loopQ.length) { finishAll(); return false; }
+    const [x, y] = loopQ.pop();
+    openWall(x, y);
+    step++;
+    cands = x % 2 === 0 ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]];
+    hl([21, 22]);
+    say(`Pętla: otwieram ścianę ${fmt([x, y])} między ${fmt(cands[0])} a ${fmt(cands[1])}. Powstaje druga droga między nimi.`);
+    if (!loopQ.length) finishAll();
+    return true;
+  }
+
+  function finishAll() {
+    phase = 'done'; cands = []; lastWall = null; setPlaying(false); hl([]);
+    say(`Gotowe po ${step} krokach. Dodatkowych przejść: ${nExtra}. Ślepe zaułki: ${deadBefore} → ${deadEnds().length}.`);
+  }
+
+  function hl(lines) { codeLines.forEach((s, i) => s.classList.toggle('on', lines.includes(i))); }
+  function say(t) { $('status').textContent = t; }
+  const PHASES = { dfs: 'DFS', braid: 'Zaułki', loops: 'Pętle', done: 'Koniec' };
+  function stats() {
+    $('sStep').textContent = step; $('sStack').textContent = stack.length;
+    $('sVis').textContent = `${visited}/${rooms}`; $('sMax').textContent = maxDepth;
+    $('sDead').textContent = deadEnds().length; $('sExtra').textContent = nExtra;
+    $('sPhase').textContent = PHASES[phase];
+  }
+
+  let cell = 10;
+  function sizeCanvas() {
+    const box = cv.parentElement.clientWidth || 600;
+    const dpr = window.devicePixelRatio || 1;
+    cell = Math.max(2, Math.floor(Math.min(box, 760) / W));
+    cv.width = cell * W * dpr; cv.height = cell * H * dpr;
+    cv.style.width = cell * W + 'px'; cv.style.maxWidth = '100%';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw() {
+    const c = { wall: css('--wall'), path: css('--path'), stack: css('--stack'), head: css('--head'),
+      done: css('--done'), cand: css('--cand'), extra: css('--extra'), line: css('--line'), muted: css('--muted') };
+    const showOdd = $('grid').checked;
+    const dfs = phase === 'dfs';
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = idx(x, y);
+      let col = c.wall;
+      if (extra[i]) col = c.extra;
+      else if (grid[i] === PASS) col = !dfs ? c.path : inStack[i] ? c.stack : popped[i] ? c.done : c.path;
+      ctx.fillStyle = col;
+      ctx.fillRect(x * cell, y * cell, cell, cell);
+      if (showOdd && grid[i] === WALL && x % 2 && y % 2 && cell >= 5) {
+        ctx.fillStyle = c.muted;
+        const r = Math.max(1, cell * 0.12);
+        ctx.beginPath(); ctx.arc(x * cell + cell / 2, y * cell + cell / 2, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    for (const [x, y] of cands) {
+      ctx.fillStyle = c.cand; ctx.globalAlpha = 0.85;
+      ctx.fillRect(x * cell + cell * 0.15, y * cell + cell * 0.15, cell * 0.7, cell * 0.7);
+      ctx.globalAlpha = 1;
+    }
+    if (lastWall && phase !== 'done') {
+      ctx.strokeStyle = c.head; ctx.lineWidth = Math.max(1, cell * 0.12);
+      ctx.strokeRect(lastWall[0] * cell + 1, lastWall[1] * cell + 1, cell - 2, cell - 2);
+    }
+    if (stack.length && dfs) {
+      ctx.strokeStyle = c.head; ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, cell * 0.14);
+      ctx.lineJoin = 'round'; ctx.beginPath();
+      stack.forEach(([x, y], k) => { const px = x * cell + cell / 2, py = y * cell + cell / 2; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      ctx.stroke(); ctx.globalAlpha = 1;
+      const [hx, hy] = stack[stack.length - 1];
+      ctx.fillStyle = c.head; ctx.fillRect(hx * cell, hy * cell, cell, cell);
+    }
+    if ($('coords').checked && W <= 21 && cell >= 22) {
+      ctx.font = `${Math.floor(cell * 0.3)}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const head = dfs && stack.length ? stack[stack.length - 1] : null;
+      for (let y = 1; y < H; y += 2) for (let x = 1; x < W; x += 2) {
+        ctx.fillStyle = grid[idx(x, y)] === WALL ? c.line : c.wall;
+        if (head && head[0] === x && head[1] === y) ctx.fillStyle = '#fff';
+        ctx.fillText(`${x},${y}`, x * cell + cell / 2, y * cell + cell / 2);
+      }
+    }
+  }
+
+  let acc = 0, last = 0;
+  function loop(ts) {
+    if (!playing) return;
+    // fazy 2–3 mają mało kroków, więc idą wolniej, żeby było je widać
+    const base = Number($('speed').value) ** 1.6;
+    const perSec = phase === 'dfs' ? base : Math.max(1, base / 4);
+    acc += Math.min(0.25, (ts - (last || ts)) / 1000) * perSec; last = ts;
+    let n = Math.floor(acc); acc -= n;
+    while (n-- > 0 && tick());
+    draw(); stats();
+    if (playing) requestAnimationFrame(loop);
+  }
+  function setPlaying(p) {
+    playing = p && phase !== 'done';
+    $('bPlay').textContent = playing ? '❚❚ Pauza' : '▶ Start';
+    if (playing) { last = 0; acc = 1; requestAnimationFrame(loop); }
+  }
+  function runToEnd() { setPlaying(false); while (tick()); draw(); stats(); }
+
+  for (const id of ['braid', 'loops']) {
+    $(id).oninput = () => { $(id + 'V').textContent = $(id).value + '%'; };
+    // po zmianie parametru przelicz ten sam labirynt (to samo ziarno) od razu do końca
+    $(id).onchange = () => { if (phase !== 'dfs' || step > 0) { reset(); runToEnd(); } };
+  }
+  $('bPlay').onclick = () => setPlaying(!playing);
+  $('bStep').onclick = () => { setPlaying(false); tick(); draw(); stats(); };
+  $('bEnd').onclick = runToEnd;
+  $('bReset').onclick = reset;
+  $('size').onchange = reset;
+  $('seed').onchange = reset;
+  $('coords').onchange = draw;
+  $('grid').onchange = draw;
+  addEventListener('resize', () => { sizeCanvas(); draw(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.fonts?.ready.then(draw);
+
+  reset();
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setPlaying(true);
+})();
+</script>
+</body>
+</html>

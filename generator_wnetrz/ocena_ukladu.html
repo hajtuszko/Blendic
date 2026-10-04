@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocena układu wnętrz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: pasek akcji nad mapą; mapa po lewej, karta oceny po prawej; niżej parametry | wyniki + historia */
+:root {
+  --bg: #eef1ee; --surface: #f9faf8; --ink: #1d2622; --muted: #5d6b65; --line: #cfd7d2;
+  --wall: #26332e; --path: #f4f2e9; --room: #e5c88f; --door: #9a5527; --wide: #6db3a3; --extra: #8b55c4;
+  --route: #3f7fd3; --dead: #d2452f; --choke: #e8932c;
+  --good: #2f7d5b; --warn: #b9811c; --bad: #c0412d;
+  --accent: #2f7d5b; --accent-fg: #ffffff; --chip: #e4e9e5; --band: #cfe3d6;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131917; --surface: #1b2320; --ink: #e3ebe6; --muted: #93a39b; --line: #2e3a35;
+    --wall: #0b0f0d; --path: #d8d4c4; --room: #c4a466; --door: #e08a4c; --wide: #5fae9c; --extra: #b48ae8;
+    --route: #6fa6f0; --dead: #f06a50; --choke: #f0a548;
+    --good: #55bb8a; --warn: #e0aa48; --bad: #f07058;
+    --accent: #4fb386; --accent-fg: #0c1410; --chip: #232d29; --band: #284236;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131917; --surface: #1b2320; --ink: #e3ebe6; --muted: #93a39b; --line: #2e3a35;
+  --wall: #0b0f0d; --path: #d8d4c4; --room: #c4a466; --door: #e08a4c; --wide: #5fae9c; --extra: #b48ae8;
+  --route: #6fa6f0; --dead: #f06a50; --choke: #f0a548;
+  --good: #55bb8a; --warn: #e0aa48; --bad: #f07058;
+  --accent: #4fb386; --accent-fg: #0c1410; --chip: #232d29; --band: #284236;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); line-height: 1.05; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 500; font-size: 18px; margin: 0; }
+.lede { margin: 0; max-width: 75ch; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+.grid2b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 20px; align-items: start; }
+@media (max-width: 980px) { .grid2, .grid2b { grid-template-columns: minmax(0, 1fr); } }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar .sp { flex: 1; }
+button { font: 600 14px var(--f-body); padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible, .thumb:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+.seedbox { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.seedbox input { width: 90px; }
+select, input[type="number"] { font: 14px var(--f-mono); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+canvas#map { display: block; max-width: 100%; height: auto; border-radius: 4px; }
+.stages { display: flex; flex-wrap: wrap; gap: 6px; }
+.stages button { font: 500 12.5px var(--f-mono); padding: 4px 9px; }
+.stages button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--muted); }
+.toggles label { display: flex; gap: 6px; align-items: center; }
+.toggles input { accent-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+.legend span { display: flex; gap: 6px; align-items: center; }
+.sw { width: 13px; height: 13px; border-radius: 3px; border: 1px solid var(--line); flex: none; }
+.msg { font-size: 13.5px; color: var(--muted); margin: 0; min-height: 1.5em; }
+.scorecard { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
+.big { font-family: var(--f-display); font-weight: 700; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.pill { display: inline-block; font: 600 12px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
+.pill.ok { color: var(--good); } .pill.no { color: var(--bad); }
+.facts { font: 12.5px/1.6 var(--f-mono); color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 600; }
+.metrics { display: flex; flex-direction: column; gap: 12px; }
+.m { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+.m .n { font-weight: 600; font-size: 14px; }
+.m .v { font: 600 13px var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.m .bar { grid-column: 1 / -1; position: relative; height: 8px; border-radius: 4px; background: var(--chip); }
+.m .bar i { position: absolute; top: 0; bottom: 0; background: var(--band); border-radius: 4px; }
+.m .bar b { position: absolute; top: -3px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; }
+.m .h { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.m .tg { font-family: var(--f-mono); }
+.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+@media (max-width: 520px) { .params { grid-template-columns: 1fr; } }
+.f { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; min-width: 0; }
+.f .top { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+.f output { font: 13px var(--f-mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.f.checks { flex-direction: row; flex-wrap: wrap; gap: 6px 14px; grid-column: 1 / -1; color: var(--muted); }
+.f.checks label { display: flex; gap: 6px; align-items: center; }
+.f.checks input { accent-color: var(--accent); }
+.tablebox { overflow-x: auto; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font: 13px var(--f-mono); font-variant-numeric: tabular-nums; }
+th, td { padding: 5px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--chip); }
+tbody tr.cur { background: var(--band); }
+td.ok { color: var(--good); } td.no { color: var(--bad); }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.thumb { display: flex; flex-direction: column; gap: 4px; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--bg); }
+.thumb.cur { border-color: var(--accent); }
+.thumb canvas { width: 100%; height: auto; display: block; border-radius: 3px; }
+.thumb span { font: 12px var(--f-mono); color: var(--muted); }
+.empty { font-size: 13.5px; color: var(--muted); }
+.how { columns: 2 320px; column-gap: 28px; font-size: 14px; color: var(--muted); }
+.how p { margin: 0 0 10px; break-inside: avoid; }
+.how b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Generator wnętrz · Recursive Backtracker + ocena grywalności</div>
+    <h1>Ocena układu wnętrz</h1>
+    <p class="lede">Każdy układ powstaje w 7 etapach: pokoje 3×3, 3×4 i 4×2, korytarze z Recursive Backtrackera na komórkach nieparzystych, drzwi, przerzedzenie, usuwanie zaułków, pętle i poszerzenia. Potem drugi algorytm mierzy 11 cech ważnych dla poruszania się gracza i porównuje układ z już zaakceptowanymi. Wyszukiwarka przegląda kolejne ziarna i bierze najlepszy układ, który przejdzie oba progi.</p>
+  </header>
+
+  <div class="grid2">
+    <section class="panel" aria-label="Mapa">
+      <div class="toolbar">
+        <button class="primary" id="bSearch">Szukaj następnego unikalnego</button>
+        <button id="bEval">Oceń ziarno</button>
+        <label class="seedbox" for="seed">ziarno <input type="number" id="seed" value="1"></label>
+        <span class="sp"></span>
+        <button id="bAccept" hidden>Zaakceptuj ten układ</button>
+      </div>
+      <canvas id="map" width="720" height="720" aria-label="Mapa wygenerowanego układu"></canvas>
+      <div class="stages" id="stages" role="group" aria-label="Etap generowania"></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="oDead" checked> ślepe zaułki</label>
+        <label><input type="checkbox" id="oChoke" checked> wąskie gardła</label>
+        <label><input type="checkbox" id="oRoute" checked> najdłuższa trasa pokój–pokój</label>
+        <label><input type="checkbox" id="oStr"> najdłuższa prosta</label>
+        <label><input type="checkbox" id="oLbl" checked> rozmiary pokoi</label>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--path)"></i>korytarz</span>
+        <span><i class="sw" style="background:var(--room)"></i>pokój</span>
+        <span><i class="sw" style="background:var(--door)"></i>drzwi</span>
+        <span><i class="sw" style="background:var(--wide)"></i>poszerzenie</span>
+        <span><i class="sw" style="background:var(--extra)"></i>dodatkowe przejście</span>
+        <span><i class="sw" style="background:var(--wall)"></i>ściana / skała</span>
+      </div>
+      <p class="msg" id="msg" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-label="Ocena">
+      <div class="scorecard">
+        <div class="big" id="score">–<small>/100</small></div>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+          <div><span class="pill" id="verdict">–</span></div>
+          <div class="facts" id="facts"></div>
+        </div>
+      </div>
+      <div class="metrics" id="metrics"></div>
+    </section>
+  </div>
+
+  <div class="grid2b">
+    <section class="panel" aria-label="Parametry">
+      <h2>Parametry</h2>
+      <div class="params">
+        <div class="f"><div class="top"><label for="size">Rozmiar mapy (kafle)</label></div>
+          <select id="size"><option value="31x31">31 × 31</option><option value="41x41" selected>41 × 41</option><option value="51x41">51 × 41</option><option value="61x45">61 × 45</option></select></div>
+        <div class="f"><div class="top"><label for="tries">Prób na wyszukiwanie</label><output id="triesV"></output></div><input type="range" id="tries" min="5" max="60" value="20"></div>
+        <div class="f checks"><span>Pokoje (w komórkach):</span>
+          <label><input type="checkbox" id="s33" checked> 3×3</label>
+          <label><input type="checkbox" id="s34" checked> 3×4 / 4×3</label>
+          <label><input type="checkbox" id="s42" checked> 4×2 / 2×4</label></div>
+        <div class="f"><div class="top"><label for="density">Zagęszczenie pokoi</label><output id="densityV"></output></div><input type="range" id="density" min="5" max="50" value="30"></div>
+        <div class="f"><div class="top"><label for="extraDoor">Dodatkowe drzwi</label><output id="extraDoorV"></output></div><input type="range" id="extraDoor" min="0" max="30" value="8"></div>
+        <div class="f"><div class="top"><label for="sparse">Przerzedzenie korytarzy</label><output id="sparseV"></output></div><input type="range" id="sparse" min="0" max="70" value="25"></div>
+        <div class="f"><div class="top"><label for="braid">Usuń ślepe zaułki</label><output id="braidV"></output></div><input type="range" id="braid" min="0" max="100" value="50"></div>
+        <div class="f"><div class="top"><label for="loops">Pętle</label><output id="loopsV"></output></div><input type="range" id="loops" min="0" max="40" value="10"></div>
+        <div class="f"><div class="top"><label for="wide">Poszerzenia (maks. liczba)</label><output id="wideV"></output></div><input type="range" id="wide" min="0" max="12" value="4"></div>
+        <div class="f"><div class="top"><label for="minScore">Próg oceny</label><output id="minScoreV"></output></div><input type="range" id="minScore" min="50" max="98" value="85"></div>
+        <div class="f"><div class="top"><label for="maxSim">Maks. podobieństwo</label><output id="maxSimV"></output></div><input type="range" id="maxSim" min="20" max="90" value="55"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Wyniki">
+      <h2>Ostatnie wyszukiwanie</h2>
+      <div class="tablebox"><table>
+        <thead><tr><th>Ziarno</th><th>Ocena</th><th>Podobieństwo</th><th>Wynik</th></tr></thead>
+        <tbody id="cands"></tbody></table></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h2>Zaakceptowane układy</h2>
+        <button id="bClear">Wyczyść historię</button>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-label="Jak to działa">
+    <h2>Jak liczona jest ocena</h2>
+    <div class="how">
+      <p><b>Twardy warunek: spójność.</b> BFS po kaflach musi dojść do każdego chodliwego pola. Układ niespójny dostaje 0 i nie przechodzi.</p>
+      <p><b>Graf nawigacyjny.</b> Każdy pokój to jeden węzeł, każda komórka korytarza to węzeł, a otwarta ściana lub drzwi to krawędź. Liczba pętli wynosi E − V + 1. Mosty (krawędzie bez obejścia) wyznacza algorytm Tarjana. Wąskim gardłem jest tylko most, który oddziela od siebie pokoje, a odnogi do ślepych zaułków się nie liczą. Po usunięciu mostów największy spójny obszar to rdzeń z pętlami.</p>
+      <p><b>Pasma docelowe.</b> Każda cecha ma przedział, w którym dostaje 100%. Poza nim wynik spada liniowo do zera. Ocena to średnia ważona. Przedziały dobrałem po zmierzeniu 300 losowych układów i warto je stroić pod konkretną grę.</p>
+      <p><b>Unikalność.</b> Mapa dzielona jest na siatkę 6×6 sektorów, a w każdym liczony jest udział pokoi i pól chodliwych. Odcisk porównywany jest z każdym zaakceptowanym układem także po odbiciach lustrzanych, bo odbita mapa gra się tak samo. Dwa losowe układy mają zwykle 10–35% podobieństwa, a prawie-duplikat ok. 100%.</p>
+      <p><b>Rozmiary pokoi</b> liczone są w komórkach logicznych siatki nieparzystej. Pokój 3×4 zajmuje 5×7 kafli, bo między komórkami są kafle ścian, które w pokoju też są wykute.</p>
+      <p><b>Poszerzenia</b> powstają tylko obok litej skały, którą zostawia przerzedzenie. Przy przerzedzeniu 0% nie ma na nie miejsca. Pas jest dobudowany wzdłuż prostego odcinka 2–4 komórek i nie łączy się z niczym innym.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+// ===== RDZEŃ: generator + ocena (bez DOM) =====
+const ROCK = 0, COR = 1, ROOM = 2, DOOR = 3, WIDE = 4, LOOP = 5;
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+function mulberry32(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+function generate(P, seed) {
+  const rng = mulberry32(seed);
+  const W = P.W, H = P.H, LW = (W - 1) / 2, LH = (H - 1) / 2;
+  const t = new Uint8Array(W * H);
+  const rid = new Int16Array(W * H).fill(-1);
+  const at = (x, y) => y * W + x;
+  const cx = i => 2 * i + 1;
+  const ri = n => Math.floor(rng() * n);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const stages = [];
+  const snap = name => stages.push({ name, t: t.slice() });
+  const inL = (i, j) => i >= 0 && i < LW && j >= 0 && j < LH;
+  const carved = (i, j) => inL(i, j) && t[at(cx(i), cx(j))] > 0;
+  const isCor = (i, j) => carved(i, j) && rid[at(cx(i), cx(j))] < 0;
+  const roomOf = (i, j) => inL(i, j) ? rid[at(cx(i), cx(j))] : -1;
+  // przejście z komórki (i,j) w kierunku (dx,dy): otwarta ściana i wykuta komórka po drugiej stronie
+  const open = (i, j, dx, dy) => carved(i + dx, j + dy) && t[at(cx(i) + dx, cx(j) + dy)] > 0;
+  const deg = (i, j) => DIRS.reduce((n, [dx, dy]) => n + (open(i, j, dx, dy) ? 1 : 0), 0);
+
+  // 1. Pokoje (rozmiary w komórkach logicznych, odstęp min. 1 komórka)
+  const sizes = [];
+  if (P.s33) sizes.push([3, 3]);
+  if (P.s34) sizes.push([3, 4], [4, 3]);
+  if (P.s42) sizes.push([4, 2], [2, 4]);
+  const rooms = [];
+  if (sizes.length) {
+    const avg = sizes.reduce((a, [w, h]) => a + w * h, 0) / sizes.length;
+    const target = Math.max(1, Math.round(LW * LH * P.density / avg));
+    for (let a = 0; a < 600 && rooms.length < target; a++) {
+      const [w, h] = sizes[ri(sizes.length)];
+      if (w > LW || h > LH) continue;
+      const i = ri(LW - w + 1), j = ri(LH - h + 1);
+      if (rooms.some(r => i < r.i + r.w + 1 && i + w + 1 > r.i && j < r.j + r.h + 1 && j + h + 1 > r.j)) continue;
+      const id = rooms.length;
+      rooms.push({ i, j, w, h });
+      for (let y = cx(j); y <= 2 * (j + h) - 1; y++) for (let x = cx(i); x <= 2 * (i + w) - 1; x++) { t[at(x, y)] = ROOM; rid[at(x, y)] = id; }
+    }
+  }
+  snap('Pokoje');
+
+  // 2. Recursive Backtracker w wolnych komórkach (może powstać kilka regionów)
+  const reg = new Int32Array(LW * LH).fill(-1);
+  rooms.forEach((r, id) => { for (let j = r.j; j < r.j + r.h; j++) for (let i = r.i; i < r.i + r.w; i++) reg[j * LW + i] = id; });
+  let nReg = rooms.length;
+  for (const s of shuffle([...Array(LW * LH).keys()])) {
+    const si = s % LW, sj = (s / LW) | 0;
+    if (carved(si, sj)) continue;
+    const r = nReg++;
+    t[at(cx(si), cx(sj))] = COR; reg[s] = r;
+    const st = [[si, sj]];
+    while (st.length) {
+      const [i, j] = st[st.length - 1];
+      const ns = DIRS.filter(([dx, dy]) => inL(i + dx, j + dy) && !carved(i + dx, j + dy));
+      if (!ns.length) { st.pop(); continue; }
+      const [dx, dy] = ns[ri(ns.length)];
+      t[at(cx(i) + dx, cx(j) + dy)] = COR; t[at(cx(i + dx), cx(j + dy))] = COR;
+      reg[(j + dy) * LW + i + dx] = r; st.push([i + dx, j + dy]);
+    }
+  }
+  snap('Labirynt DFS');
+
+  // 3. Drzwi: drzewo rozpinające regionów (Kruskal) + losowe dodatkowe drzwi
+  const parent = [...Array(nReg).keys()];
+  const find = x => { while (parent[x] !== x) x = parent[x] = parent[parent[x]]; return x; };
+  const doorsOf = r => { let n = 0; for (let k = 0; k < t.length; k++) if (t[k] === DOOR && touchesRoom(k % W, (k / W) | 0) === r) n++; return n; };
+  function touchesRoom(x, y) { for (const [dx, dy] of DIRS) { const k = at(x + dx, y + dy); if (rid[k] >= 0) return rid[k]; } return -1; }
+  const nearDoor = (x, y) => { for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (xx >= 0 && yy >= 0 && xx < W && yy < H && t[at(xx, yy)] === DOOR) return true; return false; };
+  const conns = [];
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    if (!((x + y) & 1) || t[at(x, y)] !== ROCK) continue;
+    const [ax, ay, bx, by] = x % 2 === 0 ? [x - 1, y, x + 1, y] : [x, y - 1, x, y + 1];
+    if (!t[at(ax, ay)] || !t[at(bx, by)]) continue;
+    const ra = reg[((ay - 1) / 2) * LW + (ax - 1) / 2], rb = reg[((by - 1) / 2) * LW + (bx - 1) / 2];
+    if (ra !== rb) conns.push([x, y, ra, rb, Math.max(rid[at(ax, ay)], rid[at(bx, by)])]);
+  }
+  for (const [x, y, ra, rb, room] of shuffle(conns)) {
+    if (find(ra) !== find(rb)) { parent[find(ra)] = find(rb); t[at(x, y)] = room >= 0 ? DOOR : COR; }
+    else if (room >= 0 && rng() < P.extraDoor && !nearDoor(x, y) && doorsOf(room) < 3) t[at(x, y)] = DOOR;
+  }
+  snap('Drzwi');
+
+  // 4. Przerzedzenie: zjadanie ślepych zaułków → powstaje lita skała
+  let K = 0;
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) if (isCor(i, j)) K++;
+  K = Math.round(K * P.sparse);
+  while (K > 0) {
+    const dead = [];
+    for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) if (isCor(i, j) && deg(i, j) <= 1) dead.push([i, j]);
+    if (!dead.length) break;
+    for (const [i, j] of shuffle(dead)) {
+      if (K <= 0) break;
+      if (deg(i, j) > 1) continue;
+      for (const [dx, dy] of DIRS) if (open(i, j, dx, dy)) t[at(cx(i) + dx, cx(j) + dy)] = ROCK;
+      t[at(cx(i), cx(j))] = ROCK; K--;
+    }
+  }
+  snap('Przerzedzenie');
+
+  // 5. Usuwanie części ślepych zaułków (przebicie do sąsiada, najchętniej innego zaułka)
+  const deads = [];
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) if (isCor(i, j) && deg(i, j) === 1) deads.push([i, j]);
+  for (const [i, j] of shuffle(deads)) {
+    if (deg(i, j) !== 1 || rng() >= P.braid) continue;
+    const opts = DIRS.filter(([dx, dy]) => carved(i + dx, j + dy) && t[at(cx(i) + dx, cx(j) + dy)] === ROCK)
+      .map(([dx, dy]) => ({ dx, dy, room: roomOf(i + dx, j + dy), dead: isCor(i + dx, j + dy) && deg(i + dx, j + dy) === 1 }))
+      .filter(o => o.room < 0 || (!nearDoor(cx(i) + o.dx, cx(j) + o.dy) && doorsOf(o.room) < 4));
+    if (!opts.length) continue;
+    const pool = opts.filter(o => o.dead).length ? opts.filter(o => o.dead) : opts.filter(o => o.room < 0).length ? opts.filter(o => o.room < 0) : opts;
+    const o = pool[ri(pool.length)];
+    t[at(cx(i) + o.dx, cx(j) + o.dy)] = o.room >= 0 ? DOOR : LOOP;
+  }
+  snap('Zaułki');
+
+  // 6. Pętle między korytarzami (bez ciasnych pętli 2×2)
+  const tight = (i, j, dx, dy) => [[dy, dx], [-dy, -dx]].some(([px, py]) =>
+    open(i, j, px, py) && open(i + dx, j + dy, px, py) && open(i + px, j + py, dx, dy));
+  const lw = [];
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) for (const [dx, dy] of [[1, 0], [0, 1]])
+    if (isCor(i, j) && isCor(i + dx, j + dy) && t[at(cx(i) + dx, cx(j) + dy)] === ROCK) lw.push([i, j, dx, dy]);
+  let nl = Math.round(lw.length * P.loops);
+  for (const [i, j, dx, dy] of shuffle(lw)) {
+    if (nl <= 0) break;
+    if (tight(i, j, dx, dy)) continue;
+    t[at(cx(i) + dx, cx(j) + dy)] = LOOP; nl--;
+  }
+  snap('Pętle');
+
+  // 7. Poszerzenia: prosty odcinek 2–4 komórek dostaje drugi pas od strony litej skały
+  const wc = [];
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) for (const [dx, dy] of [[1, 0], [0, 1]]) for (let L = 2; L <= 4; L++) {
+    let ok = true;
+    for (let k = 0; k < L && ok; k++) ok = isCor(i + k * dx, j + k * dy) && (k === 0 || open(i + (k - 1) * dx, j + (k - 1) * dy, dx, dy));
+    if (ok) for (const s of [1, -1]) wc.push([i, j, dx, dy, L, s]);
+  }
+  let nw = 0;
+  for (const [i, j, dx, dy, L, s] of shuffle(wc)) {
+    if (nw >= P.wide) break;
+    const px = dy * s, py = dx * s;
+    const x0 = cx(i), y0 = cx(j), x1 = cx(i + (L - 1) * dx), y1 = cx(j + (L - 1) * dy);
+    let ok = true;
+    for (let off = 1; off <= 2 && ok; off++) for (let k = -1; k <= (x1 - x0) + (y1 - y0) + 1 && ok; k++) {
+      const x = x0 + k * dx + px * off, y = y0 + k * dy + py * off;
+      ok = x >= 0 && y >= 0 && x < W && y < H && t[at(x, y)] === ROCK;
+    }
+    if (!ok) continue;
+    for (let k = 0; k <= (x1 - x0) + (y1 - y0); k++) t[at(x0 + k * dx + px, y0 + k * dy + py)] = WIDE;
+    nw++;
+  }
+  snap('Poszerzenia');
+
+  return { W, H, LW, LH, t, rid, rooms, stages, seed };
+}
+
+// ===== OCENA =====
+const band = (v, lo, hi, soft) => v >= lo && v <= hi ? 1 : Math.max(0, 1 - (v < lo ? lo - v : v - hi) / soft);
+
+// odcisk przestrzenny: siatka 6×6 sektorów, w każdym udział pokoi i udział pól chodliwych
+const SIG = 6;
+function signature(G) {
+  const sig = [];
+  for (let sy = 0; sy < SIG; sy++) for (let sx = 0; sx < SIG; sx++) {
+    const xa = Math.floor(sx * G.W / SIG), xb = Math.floor((sx + 1) * G.W / SIG), ya = Math.floor(sy * G.H / SIG), yb = Math.floor((sy + 1) * G.H / SIG);
+    let room = 0, walk = 0, n = 0;
+    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) { const v = G.t[y * G.W + x]; n++; if (v === ROOM) room++; if (v) walk++; }
+    sig.push(room / n, walk / n);
+  }
+  return sig;
+}
+// podobieństwo 0..1 z uwzględnieniem odbić lustrzanych; przeskalowane tak, że dwa losowe układy dają ok. 0.1–0.35, a prawie-duplikat ~1
+function similarity(a, b) {
+  let best = 0;
+  for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+    let d = 0;
+    for (let y = 0; y < SIG; y++) for (let x = 0; x < SIG; x++) {
+      const i = 2 * (y * SIG + x), j = 2 * ((fy ? SIG - 1 - y : y) * SIG + (fx ? SIG - 1 - x : x));
+      d += Math.abs(a[i] - b[j]) * 1.5 + Math.abs(a[i + 1] - b[j + 1]);
+    }
+    best = Math.max(best, 1 - d / (SIG * SIG) / 1.2);
+  }
+  return Math.max(0, Math.min(1, (best - 0.6) / 0.4));
+}
+
+function evaluate(G, P, history) {
+  const { W, H, LW, LH, t, rid, rooms } = G;
+  const at = (x, y) => y * W + x, cx = i => 2 * i + 1, R = rooms.length;
+  // spójność na poziomie kafli
+  const bfs = (sx, sy) => {
+    const d = new Int32Array(W * H).fill(-1), par = new Int32Array(W * H).fill(-1), q = [at(sx, sy)];
+    d[q[0]] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h], x = k % W, y = (k / W) | 0;
+      for (const [dx, dy] of DIRS) { const n = at(x + dx, y + dy); if (t[n] && d[n] < 0) { d[n] = d[k] + 1; par[n] = k; q.push(n); } }
+    }
+    return { d, par, n: q.length };
+  };
+  let walk = 0, first = -1;
+  for (let k = 0; k < t.length; k++) if (t[k]) { walk++; if (first < 0) first = k; }
+  const connected = walk > 0 && bfs(first % W, (first / W) | 0).n === walk;
+
+  // graf abstrakcyjny: pokój = 1 węzeł, komórka korytarza = 1 węzeł
+  const node = new Int32Array(LW * LH).fill(-1), corCells = [];
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
+    const k = at(cx(i), cx(j));
+    if (!t[k]) continue;
+    if (rid[k] >= 0) node[j * LW + i] = rid[k]; else { node[j * LW + i] = R + corCells.length; corCells.push([i, j]); }
+  }
+  const V = R + corCells.length, adj = Array.from({ length: V }, () => []), edges = [];
+  for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) for (const [dx, dy] of [[1, 0], [0, 1]]) {
+    if (i + dx >= LW || j + dy >= LH) continue;
+    const a = node[j * LW + i], b = node[(j + dy) * LW + i + dx];
+    if (a < 0 || b < 0 || a === b || !t[at(cx(i) + dx, cx(j) + dy)]) continue;
+    adj[a].push(b); adj[b].push(a); edges.push([a, b, cx(i) + dx, cx(j) + dy]);
+  }
+  const E = edges.length, degN = adj.map(a => a.length);
+  const cycles = connected ? E - V + 1 : 0;
+  const deadList = corCells.filter((_, k) => degN[R + k] === 1);
+  const junctions = corCells.filter((_, k) => degN[R + k] >= 3).length;
+  // kształty komórek korytarza
+  const shapes = [0, 0, 0, 0, 0];
+  corCells.forEach(([i, j], k) => {
+    const d = degN[R + k];
+    if (d <= 1) shapes[0]++;
+    else if (d === 2) { const h = t[at(cx(i) - 1, cx(j))] && t[at(cx(i) + 1, cx(j))], v = t[at(cx(i), cx(j) - 1)] && t[at(cx(i), cx(j) + 1)]; shapes[h || v ? 1 : 2]++; }
+    else shapes[d === 3 ? 3 : 4]++;
+  });
+  const nc = Math.max(1, corCells.length);
+  const entropy = -shapes.reduce((s, c) => c ? s + c / nc * Math.log2(c / nc) : s, 0) / Math.log2(5);
+  // mosty (Tarjan) + liczba pokoi w poddrzewie DFS
+  const disc = new Int32Array(V).fill(-1), low = new Int32Array(V), sub = new Int32Array(V);
+  let timer = 0; const bridges = [];
+  const dfs = (u, p) => {
+    disc[u] = low[u] = timer++; sub[u] = u < R ? 1 : 0;
+    let skipped = false;
+    for (const v of adj[u]) {
+      if (v === p && !skipped) { skipped = true; continue; }
+      if (disc[v] < 0) {
+        dfs(v, u); sub[u] += sub[v]; low[u] = Math.min(low[u], low[v]);
+        if (low[v] > disc[u]) bridges.push([u, v, sub[v]]);
+      } else low[u] = Math.min(low[u], disc[v]);
+    }
+  };
+  for (let u = 0; u < V; u++) if (disc[u] < 0) dfs(u, -1);
+  const key = (a, b) => a < b ? a + ',' + b : b + ',' + a;
+  const bset = new Set(bridges.map(([a, b]) => key(a, b)));
+  // wąskie gardło = most, po którego obu stronach są pokoje
+  const gate = new Set(bridges.filter(([, , k]) => k > 0 && k < R).map(([a, b]) => key(a, b)));
+  const chokes = edges.filter(([a, b]) => gate.has(key(a, b)));
+  // obszary 2-spójne krawędziowo (bez mostów): największy z nich to „rdzeń z pętlami”
+  const comp = new Int32Array(V).fill(-1); let core = 0;
+  for (let s0 = 0; s0 < V; s0++) {
+    if (comp[s0] >= 0) continue;
+    comp[s0] = s0; const q = [s0]; let rc = 0;
+    for (let h = 0; h < q.length; h++) { const u = q[h]; if (u < R) rc++;
+      for (const v of adj[u]) if (comp[v] < 0 && !bset.has(key(u, v))) { comp[v] = s0; q.push(v); } }
+    core = Math.max(core, rc);
+  }
+  const coreFrac = R ? core / R : 0;
+  // trasy między pokojami
+  const centers = rooms.map(r => [Math.round((cx(r.i) + 2 * (r.i + r.w) - 1) / 2) | 1, Math.round((cx(r.j) + 2 * (r.j + r.h) - 1) / 2) | 1]);
+  let tSum = 0, tN = 0, far = { d: -1 };
+  centers.forEach(([x, y], a) => {
+    const B = bfs(x, y);
+    centers.forEach(([x2, y2], b) => {
+      if (b <= a) return;
+      const d = B.d[at(x2, y2)]; if (d < 0) return;
+      tSum += d / (Math.abs(x - x2) + Math.abs(y - y2)); tN++;
+      if (d > far.d) { const path = []; for (let k = at(x2, y2); k >= 0; k = B.par[k]) path.push(k); far = { d, path }; }
+    });
+  });
+  const tort = tN ? tSum / tN : 0;
+  // najdłuższy prosty odcinek korytarza
+  let straight = { len: 0 };
+  const scan = (outer, inner, get) => {
+    for (let o = 0; o < outer; o++) { let run = 0;
+      for (let k = 0; k <= inner; k++) {
+        const v = k < inner ? get(o, k) : 0;
+        if (v && rid[v - 1] < 0) run++;
+        else { if (run > straight.len) straight = { len: run, a: get(o, k - run) - 1, b: get(o, k - 1) - 1 }; run = 0; }
+      }
+    }
+  };
+  scan(H, W, (y, x) => t[at(x, y)] ? at(x, y) + 1 : 0);
+  scan(W, H, (x, y) => t[at(x, y)] ? at(x, y) + 1 : 0);
+  // rozkład pokoi w sektorach 3×3
+  const sect = new Set(centers.map(([x, y]) => Math.min(2, Math.floor(x * 3 / W)) + 3 * Math.min(2, Math.floor(y * 3 / H))));
+  const coverage = R ? sect.size / Math.min(9, R) : 0;
+  // drzwi na pokój
+  const doors = new Array(R).fill(0);
+  for (let k = 0; k < t.length; k++) if (t[k] === DOOR) { const x = k % W, y = (k / W) | 0;
+    for (const [dx, dy] of DIRS) { const r = rid[at(x + dx, y + dy)]; if (r >= 0) { doors[r]++; break; } } }
+  const doorAvg = R ? doors.reduce((a, b) => a + b, 0) / R : 0;
+  const oneDoor = doors.filter(d => d === 1).length;
+  const types = new Set(rooms.map(r => Math.min(r.w, r.h) + 'x' + Math.max(r.w, r.h)));
+  const enabled = (P.s33 ? 1 : 0) + (P.s34 ? 1 : 0) + (P.s42 ? 1 : 0);
+  let wideTiles = 0; for (let k = 0; k < t.length; k++) if (t[k] === WIDE) wideTiles++;
+
+  const sig = signature(G);
+  let maxSim = 0, simTo = null;
+  for (const h of history || []) { const s = similarity(sig, h.sig); if (s > maxSim) { maxSim = s; simTo = h.seed; } }
+
+  const M = [
+    { key: 'loops', name: 'Pętle na pokój', v: cycles / Math.max(1, R), lo: 0.5, hi: 1.5, soft: 0.8, w: 1.2, f: 2, hint: 'Alternatywne drogi: gracz może obejść przeciwnika i nie wraca tą samą trasą.' },
+    { key: 'dead', name: 'Ślepe zaułki na pokój', v: deadList.length / Math.max(1, R), lo: 0.2, hi: 1.0, soft: 1, w: 1, f: 2, hint: 'Kilka nagradza eksplorację (skrzynka, sekret); za dużo męczy cofaniem.' },
+    { key: 'lin', name: 'Pokoje w pętlach', v: coreFrac, lo: 0.5, hi: 0.85, soft: 0.35, w: 1, f: 0, pct: true, hint: `Udział pokoi w największym obszarze z alternatywnymi drogami. Pozostałe ${R - core} leżą za wąskim gardłem (pomarańczowe): dobre miejsce na klucz, bossa lub skarb. Gdy jest ich za dużo, układ robi się liniowy.` },
+    { key: 'tort', name: 'Krętość tras', v: tort, lo: 1.3, hi: 2.2, soft: 0.6, w: 1.2, f: 2, hint: 'Długość drogi między pokojami ÷ odległość w linii prostej. 1 = nudno prosto, >2.5 = frustrujący labirynt.' },
+    { key: 'str', name: 'Najdłuższa prosta', v: straight.len / Math.max(W, H), lo: 0, hi: 0.35, soft: 0.3, w: 1, f: 0, pct: true, hint: 'Długi prosty korytarz to martwy czas i otwarta linia strzału.' },
+    { key: 'junc', name: 'Skrzyżowania', v: junctions / nc, lo: 0.12, hi: 0.32, soft: 0.15, w: 0.8, f: 0, pct: true, hint: 'Udział komórek korytarza z 3–4 wyjściami: punkty decyzji gracza.' },
+    { key: 'cov', name: 'Rozłożenie pokoi', v: coverage, lo: 0.75, hi: 1, soft: 0.45, w: 1, f: 0, pct: true, hint: 'Ile sektorów mapy 3×3 ma pokój. Skupione pokoje zostawiają puste połacie korytarzy.' },
+    { key: 'door', name: 'Drzwi na pokój', v: doorAvg, lo: 1.5, hi: 2.6, soft: 1, w: 1, f: 2, hint: `Pokój z 1 drzwiami to ślepa kieszeń; jest ich ${oneDoor} z ${R}.` },
+    { key: 'var', name: 'Różnorodność pokoi', v: enabled ? types.size / enabled : 0, lo: 1, hi: 1, soft: 0.7, w: 0.6, f: 0, pct: true, hint: `Użyte typy: ${[...types].join(', ') || 'brak'}.` },
+    { key: 'ent', name: 'Różnorodność kształtów', v: entropy, lo: 0.65, hi: 1, soft: 0.35, w: 0.8, f: 0, pct: true, hint: 'Entropia typów komórek (prosta, zakręt, T, krzyż, zaułek). Niska = monotonne powtórzenia.' },
+    { key: 'uniq', name: 'Unikalność', v: 1 - maxSim, lo: 0.45, hi: 1, soft: 0.35, w: 1.2, f: 0, pct: true, hint: history && history.length ? `Najbardziej podobny do zaakceptowanego #${simTo} (${Math.round(maxSim * 100)}%, z odbiciami lustrzanymi).` : 'Brak historii, więc nie ma z czym porównać.' },
+  ];
+  let sw = 0, ss = 0;
+  for (const m of M) { m.s = band(m.v, m.lo, m.hi, m.soft); sw += m.w; ss += m.s * m.w; }
+  const score = connected ? Math.round(ss / sw * 100) : 0;
+  return { connected, score, M, maxSim, simTo, sig, seed: G.seed, cycles, V, E, wideTiles,
+    deadList, chokes, straight, far, rooms: R, doors };
+}
+(() => {
+  const $ = id => document.getElementById(id);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const STAGES = ['Pokoje', 'Labirynt DFS', 'Drzwi', 'Przerzedzenie', 'Zaułki', 'Pętle', 'Poszerzenia'];
+  let history = [], cands = [], cur = null, stage = 6;
+
+  const sliders = { tries: v => v, density: v => v + '%', extraDoor: v => v + '%', sparse: v => v + '%', braid: v => v + '%',
+    loops: v => v + '%', wide: v => v, minScore: v => v, maxSim: v => v + '%' };
+  for (const [id, f] of Object.entries(sliders)) {
+    const upd = () => { $(id + 'V').textContent = f($(id).value); };
+    $(id).addEventListener('input', upd); upd();
+  }
+  function readP() {
+    const [W, H] = $('size').value.split('x').map(Number);
+    return { W, H, density: $('density').value / 100, s33: $('s33').checked, s34: $('s34').checked, s42: $('s42').checked,
+      extraDoor: $('extraDoor').value / 100, sparse: $('sparse').value / 100, braid: $('braid').value / 100,
+      loops: $('loops').value / 100, wide: Number($('wide').value) };
+  }
+
+  function verdictOf(e) {
+    if (!e.connected) return 'niespójny';
+    if (e.score < Number($('minScore').value)) return `ocena < ${$('minScore').value}`;
+    if (e.maxSim * 100 > Number($('maxSim').value)) return `podobny do #${e.simTo}`;
+    return null;
+  }
+  function run(seed, P) {
+    const G = generate(P, seed);
+    const e = evaluate(G, P, history);
+    return { seed, G, e, why: verdictOf(e) };
+  }
+
+  function search(silent) {
+    const P = readP(), base = Number($('seed').value) || 1, N = Number($('tries').value);
+    cands = [];
+    for (let s = base; s < base + N; s++) cands.push(run(s, P));
+    $('seed').value = base + N;
+    const okc = cands.filter(c => !c.why);
+    const best = (okc.length ? okc : cands).reduce((a, b) => b.e.score > a.e.score ? b : a);
+    if (okc.length) {
+      history.push({ seed: best.seed, sig: best.e.sig, score: best.e.score, G: best.G, e: best.e });
+      best.accepted = true;
+    }
+    if (!silent) {
+      show(best);
+      say(okc.length
+        ? `Sprawdzono ${N} ziaren (${base}–${base + N - 1}). Progi przeszło ${okc.length}, zaakceptowano najlepszy: #${best.seed} (${best.e.score} pkt).`
+        : `Żadne z ${N} ziaren nie przeszło progów. Pokazuję najlepsze odrzucone (#${best.seed}, powód: ${best.why}). Zwiększ liczbę prób albo poluzuj progi.`);
+    }
+    return best;
+  }
+
+  function show(c) {
+    cur = c; stage = 6;
+    $('bAccept').hidden = !!c.accepted || !!c.why || history.some(h => h.seed === c.seed);
+    renderStages(); draw(); renderScore(); renderCands(); renderThumbs();
+  }
+  const say = t => { $('msg').textContent = t; };
+
+  function renderStages() {
+    $('stages').innerHTML = '';
+    STAGES.forEach((n, k) => {
+      const b = document.createElement('button');
+      b.textContent = `${k + 1}. ${n}`; b.className = k === stage ? 'on' : '';
+      b.setAttribute('aria-pressed', k === stage);
+      b.onclick = () => { stage = k; renderStages(); draw(); };
+      $('stages').appendChild(b);
+    });
+  }
+
+  function colors() {
+    return ['--wall', '--path', '--room', '--door', '--wide', '--extra'].map(css);
+  }
+  function paint(ctx, G, t, cell, col) {
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
+      ctx.fillStyle = col[t[y * G.W + x]]; ctx.fillRect(x * cell, y * cell, cell, cell);
+    }
+  }
+
+  const cv = $('map'), ctx = cv.getContext('2d');
+  function draw() {
+    if (!cur) return;
+    const { G, e } = cur;
+    const box = cv.parentElement.clientWidth - 28 || 600;
+    const cell = Math.max(3, Math.floor(Math.min(box, 720) / G.W));
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = cell * G.W * dpr; cv.height = cell * G.H * dpr; cv.style.width = cell * G.W + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = G.stages[stage].t;
+    paint(ctx, G, t, cell, colors());
+    const ctr = k => [(k % G.W) * cell + cell / 2, Math.floor(k / G.W) * cell + cell / 2];
+    if (stage === 6) {
+      if ($('oStr').checked && e.straight.len) {
+        const [ax, ay] = ctr(e.straight.a), [bx, by] = ctr(e.straight.b);
+        ctx.strokeStyle = css('--route'); ctx.lineWidth = Math.max(2, cell * 0.5); ctx.globalAlpha = 0.45; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      if ($('oRoute').checked && e.far.path) {
+        ctx.strokeStyle = css('--route'); ctx.lineWidth = Math.max(1.5, cell * 0.22); ctx.setLineDash([cell * 0.6, cell * 0.4]); ctx.lineJoin = 'round';
+        ctx.beginPath(); e.far.path.forEach((k, i) => { const [x, y] = ctr(k); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+      }
+      if ($('oChoke').checked) {
+        ctx.strokeStyle = css('--choke'); ctx.lineWidth = Math.max(1.5, cell * 0.2);
+        for (const [, , x, y] of e.chokes) ctx.strokeRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+      }
+      if ($('oDead').checked) {
+        ctx.fillStyle = css('--dead');
+        for (const [i, j] of e.deadList) { ctx.beginPath(); ctx.arc((2 * i + 1) * cell + cell / 2, (2 * j + 1) * cell + cell / 2, Math.max(2, cell * 0.38), 0, 7); ctx.fill(); }
+      }
+    }
+    if ($('oLbl').checked && cell >= 9) {
+      ctx.fillStyle = css('--wall'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `600 ${Math.max(9, Math.floor(cell * 0.9))}px "JetBrains Mono", monospace`;
+      for (const r of G.rooms) {
+        const x = (2 * r.i + 1 + 2 * (r.i + r.w) - 1) / 2 * cell + cell / 2, y = (2 * r.j + 1 + 2 * (r.j + r.h) - 1) / 2 * cell + cell / 2;
+        ctx.fillText(`${r.w}×${r.h}`, x, y);
+      }
+    }
+  }
+
+  function fmtV(m) { return m.pct ? Math.round(m.v * 100) + '%' : m.v.toFixed(m.f); }
+  function fmtT(m) {
+    const f = v => m.pct ? Math.round(v * 100) + '%' : v.toFixed(m.f === 0 ? 0 : 1);
+    return m.lo === m.hi ? f(m.lo) : m.lo === 0 ? '≤ ' + f(m.hi) : `${f(m.lo)}–${f(m.hi)}`;
+  }
+  function renderScore() {
+    const { e, why, seed, G } = cur;
+    $('score').innerHTML = `${e.score}<small>/100</small>`;
+    const accepted = history.some(h => h.seed === seed);
+    $('verdict').className = 'pill ' + (why ? 'no' : 'ok');
+    $('verdict').textContent = why ? 'odrzucony: ' + why : accepted ? 'zaakceptowany' : 'przechodzi progi';
+    $('facts').innerHTML = `ziarno <b>#${seed}</b> · mapa <b>${G.W}×${G.H}</b><br>pokoje <b>${e.rooms}</b> · pętle <b>${e.cycles}</b> · węzły <b>${e.V}</b><br>kafle poszerzeń <b>${e.wideTiles}</b> · spójny <b>${e.connected ? 'tak' : 'NIE'}</b>`;
+    const box = $('metrics'); box.innerHTML = '';
+    for (const m of e.M) {
+      const dmax = Math.max(m.hi + m.soft, m.v, m.pct ? 1 : 0) * 1.05;
+      const pc = v => Math.max(0, Math.min(100, v / dmax * 100));
+      const col = m.s >= 0.999 ? 'var(--good)' : m.s >= 0.5 ? 'var(--warn)' : 'var(--bad)';
+      const d = document.createElement('div'); d.className = 'm';
+      d.innerHTML = `<div class="n">${m.name}</div><div class="v" style="color:${col}">${fmtV(m)} · ${Math.round(m.s * 100)}%</div>
+        <div class="bar" title="cel ${fmtT(m)}"><i style="left:${pc(m.lo)}%;width:${Math.max(1.5, pc(m.hi) - pc(m.lo))}%"></i><b style="left:${pc(m.v)}%;background:${col}"></b></div>
+        <div class="h">cel <span class="tg">${fmtT(m)}</span> · waga ${m.w}. ${m.hint}</div>`;
+      box.appendChild(d);
+    }
+  }
+
+  function renderCands() {
+    const tb = $('cands'); tb.innerHTML = '';
+    if (!cands.length) { tb.innerHTML = '<tr><td colspan="4" class="empty">Brak wyszukiwań.</td></tr>'; return; }
+    for (const c of cands) {
+      const tr = document.createElement('tr'); tr.tabIndex = 0;
+      if (cur && c.seed === cur.seed) tr.className = 'cur';
+      const acc = history.some(h => h.seed === c.seed);
+      tr.innerHTML = `<td>#${c.seed}</td><td>${c.e.score}</td><td>${Math.round(c.e.maxSim * 100)}%</td><td class="${c.why ? 'no' : 'ok'}">${c.why || (acc ? 'zaakceptowany' : 'przechodzi')}</td>`;
+      tr.onclick = tr.onkeydown = ev => { if (ev.type === 'keydown' && ev.key !== 'Enter') return; show(c); };
+      tb.appendChild(tr);
+    }
+  }
+
+  function renderThumbs() {
+    const box = $('thumbs'); box.innerHTML = '';
+    if (!history.length) { box.innerHTML = '<div class="empty">Brak zaakceptowanych układów. Kliknij „Szukaj następnego unikalnego”.</div>'; return; }
+    const col = colors();
+    for (const h of [...history].reverse()) {
+      const d = document.createElement('div'); d.className = 'thumb' + (cur && cur.seed === h.seed ? ' cur' : ''); d.tabIndex = 0;
+      const c = document.createElement('canvas'); c.width = h.G.W * 3; c.height = h.G.H * 3;
+      paint(c.getContext('2d'), h.G, h.G.t, 3, col);
+      const s = document.createElement('span'); s.textContent = `#${h.seed} · ${h.score} pkt`;
+      d.append(c, s);
+      d.onclick = d.onkeydown = ev => { if (ev.type === 'keydown' && ev.key !== 'Enter') return; show({ seed: h.seed, G: h.G, e: h.e, why: null, accepted: true }); };
+      box.appendChild(d);
+    }
+  }
+
+  $('bSearch').onclick = () => search(false);
+  $('bEval').onclick = () => {
+    const s = Number($('seed').value) || 1; const c = run(s, readP());
+    cands = [c]; show(c);
+    say(c.why ? `Ziarno #${s} nie przechodzi: ${c.why}.` : `Ziarno #${s} przechodzi progi. Możesz je zaakceptować, wtedy kolejne układy będą z nim porównywane.`);
+  };
+  $('bAccept').onclick = () => {
+    if (!cur || cur.why) return;
+    history.push({ seed: cur.seed, sig: cur.e.sig, score: cur.e.score, G: cur.G, e: cur.e });
+    cur.accepted = true; show(cur); say(`Zaakceptowano #${cur.seed}.`);
+  };
+  $('bClear').onclick = () => { history = []; if (cur) { cur.accepted = false; } renderThumbs(); renderCands(); if (cur) renderScore(); say('Historia wyczyszczona. Unikalność liczona jest od zera.'); };
+  for (const id of ['oDead', 'oChoke', 'oRoute', 'oStr', 'oLbl']) $(id).onchange = draw;
+  for (const id of ['minScore', 'maxSim']) $(id).addEventListener('change', () => {
+    if (!cur) return;
+    cands.forEach(c => { c.why = verdictOf(c.e); });
+    cur.why = history.some(h => h.seed === cur.seed) ? null : verdictOf(cur.e);
+    show(cur);
+  });
+  addEventListener('resize', draw);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { draw(); renderThumbs(); });
+  new MutationObserver(() => { draw(); renderThumbs(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.fonts?.ready.then(draw);
+
+  // stan startowy: trzy wyszukiwania, żeby historia i unikalność miały z czym pracować
+  search(true); search(true); search(false);
+  say(`Na start wykonano 3 wyszukiwania po ${$('tries').value} ziaren. W historii: ${history.length} układy. ` + $('msg').textContent);
+})();
+</script>
+</body>
+</html>
