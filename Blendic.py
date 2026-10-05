@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Blendic",
     "author": "PatrykGPT",
-    "version": (1, 0, 5),
+    "version": (1, 0, 6),
     "blender": (4, 4, 0),
     "location": "3D Viewport > Sidebar > Blendic",
     "description": "Automatycznie aktualizuje obraz w UV Editorze na podstawie materiału wybranej powierzchni",
@@ -10,9 +10,10 @@ bl_info = {
 
 import bpy
 from bpy.types import Panel, Operator, AddonPreferences
-from bpy.props import StringProperty
+from bpy.props import StringProperty, EnumProperty, FloatProperty
 from bpy.app.handlers import persistent
 import bmesh
+from mathutils import Vector
 import os
 import urllib.request
 import urllib.error
@@ -249,6 +250,80 @@ class BLENDIC_OT_update_image(Operator):
             self.report({'WARNING'}, "Nie znaleziono odpowiedniego obrazu lub powierzchni")
         return {'FINISHED'}
 
+class BLENDIC_OT_axis_extrude(Operator):
+    """Wyciągnij zaznaczenie wzdłuż wybranej osi"""
+    bl_idname = "blendic.axis_extrude"
+    bl_label = "Axis Extrude"
+    bl_description = "Wyciągnij zaznaczone powierzchnie/krawędzie/wierzchołki wzdłuż osi X, Y lub Z"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    axis: EnumProperty(
+        name="Oś",
+        items=[
+            ('X', "X", "Wyciągnij wzdłuż osi X"),
+            ('Y', "Y", "Wyciągnij wzdłuż osi Y"),
+            ('Z', "Z", "Wyciągnij wzdłuż osi Z"),
+        ],
+        default='Z',
+    )
+
+    distance: FloatProperty(
+        name="Odległość",
+        description="Długość wyciągnięcia (ujemna = w przeciwną stronę)",
+        default=1.0,
+        unit='LENGTH',
+    )
+
+    orientation: EnumProperty(
+        name="Orientacja",
+        items=[
+            ('GLOBAL', "Global", "Osie świata"),
+            ('LOCAL', "Local", "Osie obiektu"),
+        ],
+        default='GLOBAL',
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH' and context.mode == 'EDIT_MESH'
+
+    def execute(self, context):
+        obj = context.active_object
+        bm = bmesh.from_edit_mesh(obj.data)
+
+        faces = [f for f in bm.faces if f.select]
+        edges = [e for e in bm.edges if e.select]
+        verts = [v for v in bm.verts if v.select]
+
+        if not verts:
+            self.report({'WARNING'}, "Nic nie jest zaznaczone")
+            return {'CANCELLED'}
+
+        ret = bmesh.ops.extrude_face_region(bm, geom=faces + edges + verts)
+        new_geom = ret["geom"]
+
+        direction = Vector((0.0, 0.0, 0.0))
+        direction["XYZ".index(self.axis)] = self.distance
+        if self.orientation == 'GLOBAL':
+            # Przelicz wektor świata na przestrzeń obiektu
+            direction = obj.matrix_world.to_3x3().inverted_safe() @ direction
+
+        new_verts = [g for g in new_geom if isinstance(g, bmesh.types.BMVert)]
+        bmesh.ops.translate(bm, vec=direction, verts=new_verts)
+
+        # Zaznacz tylko nową geometrię
+        for elem in verts + edges + faces:
+            if elem.is_valid:
+                elem.select = False
+        for elem in new_geom:
+            elem.select = True
+        bm.select_flush(True)
+
+        bm.normal_update()
+        bmesh.update_edit_mesh(obj.data)
+        return {'FINISHED'}
+
 class BLENDIC_PT_panel(Panel):
     """Panel Blendic w sidebarze"""
     bl_label = "Blendic"
@@ -278,7 +353,18 @@ class BLENDIC_PT_panel(Panel):
         layout.operator("blendic.update_image", text="Update Image", icon='FILE_REFRESH')
         
         layout.separator()
-        
+
+        # Sekcja Axis Extrude
+        box = layout.box()
+        box.label(text="Axis Extrude:", icon='EMPTY_ARROWS')
+        row = box.row(align=True)
+        for axis in ('X', 'Y', 'Z'):
+            op = row.operator("blendic.axis_extrude", text=axis)
+            op.axis = axis
+        box.label(text="Odległość zmienisz w panelu F9")
+
+        layout.separator()
+
         # Sekcja aktualizacji
         box = layout.box()
         box.label(text="Aktualizacje:", icon='WORLD')
@@ -415,6 +501,7 @@ classes = [
     BLENDIC_OT_update_addon,
     BLENDIC_OT_run,
     BLENDIC_OT_update_image,
+    BLENDIC_OT_axis_extrude,
     BLENDIC_PT_panel,
 ]
 
